@@ -15,10 +15,8 @@ class Card:
         self.rotation = 0
         
         # Pre-compute rank and suit info
-        ranks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-        rank_idx = rank - 1 if rank <= 10 else {11: 0, 12: 1, 13: 2, 14: 3}[rank]
         
-        if rank_idx == 0 or rank == 1:
+        if rank == 1:
             self.rank_str = 'A'
         elif rank == 11:
             self.rank_str = 'J'
@@ -248,17 +246,14 @@ class Game:
         # Generate 52 unique cards (Ace-King × 4 suits) and place them randomly
         decks_suits = ['H', 'D', 'C', 'S']
         
-        unique_cards = []
         for suit in decks_suits:
             ranks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
             for rank_val in ranks:
-                unique_cards.append(Card(rank_val, suit))
+                self.table_cards.append(Card(rank_val, suit))
         
-        random.shuffle(unique_cards)
-        self.table_cards.extend(unique_cards)
         
         # Now place each card at random position
-        for card in unique_cards:
+        for card in self.table_cards:
             rand_x = random.randint(self.margin_left, self.max_x - 70)
             rand_y = random.randint(self.margin_top, self.max_y - 98)
             
