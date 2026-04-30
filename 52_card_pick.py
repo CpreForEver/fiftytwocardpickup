@@ -8,25 +8,30 @@ logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %
 logger = logging.getLogger(__name__)
 
 class Card:
-    def __init__(self, value):
-        self.value = value
+    def __init__(self, rank, suit):
+        self.value = rank
+        self.suit = suit
         self.face_up = True
         self.rotation = 0
         
         # Pre-compute rank and suit info
-        suits = ['H', 'D', 'C', 'S']
         ranks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-        suit_idx = (value - 1) // 13
-        rank_idx = (value - 1) % 13
+        rank_idx = rank - 1 if rank <= 10 else {11: 0, 12: 1, 13: 2, 14: 3}[rank]
         
-        if rank_idx == 0:
+        if rank_idx == 0 or rank == 1:
             self.rank_str = 'A'
+        elif rank == 11:
+            self.rank_str = 'J'
+        elif rank == 12:
+            self.rank_str = 'Q'
+        elif rank == 13:
+            self.rank_str = 'K'
         else:
-            self.rank_str = ranks[rank_idx] if ranks[rank_idx] <= 10 else {11:'J', 12:'Q', 13:'K', 14:'A'}[ranks[rank_idx]]
+            self.rank_str = str(rank)
         
-        self.suit_char = {'H': '♥', 'D': '♦', 'C': '♣', 'S': '♠'}[suits[suit_idx]]
+        self.suit_char = {'H': '♥', 'D': '♦', 'C': '♣', 'S': '♠'}[suit]
         # Set text color based on suit (red for hearts/diamonds, black for clubs/spades)
-        if suits[suit_idx] in ['H', 'D']:
+        if suit in ['H', 'D']:
             self.suit_color = 'red'
         else:
             self.suit_color = 'black'
@@ -41,26 +46,32 @@ class CardWidget:
         rank_str = self.card.rank_str
         suit_char = self.card.suit_char
         
-        canvas = tk.Canvas(self.parent, width=70, height=98, bg='#FFF8F0')
+        canvas = tk.Canvas(self.parent, width=70, height=98)
         
-        # Draw face-up card with rotation (centered)
+        # Draw face-up card with rotation (centered) - each rotation shows different face
         if self.card.face_up:
             # Calculate centered positions for 70x98 card
             cx = 35  # center x (width/2)
             cy = 49  # center y (height/2)
             
+            # Each rotation shows a unique representation
             if self.card.rotation == 1:
-                canvas.create_text(cx, cy - 15, text=f"✓\n{rank_str}\n{suit_char}", 
-                                  font=('Arial', 14), anchor='center', fill=self.card.suit_color)
+                canvas.create_text(cx, cy - 10, text=f"{rank_str}", 
+                                  font=('Arial', 18, 'bold'), anchor='center', fill=self.card.suit_color)
             elif self.card.rotation == 2:
-                canvas.create_text(cx, cy + 10, text=f"{suit_char}\n{rank_str} (flipped)", 
-                                  font=('Arial', 14), anchor='center', fill=self.card.suit_color)
+                canvas.create_text(cx, cy + 15, text=suit_char, 
+                                  font=('Arial', 32), anchor='center', fill=self.card.suit_color)
             elif self.card.rotation == 3:
-                canvas.create_text(cx, cy - 15, text=f"✓\n{rank_str}\n{suit_char}", 
-                                  font=('Arial', 14), anchor='center', fill=self.card.suit_color)
+                canvas.create_text(cx, cy - 10, text=f"{rank_str} {suit_char}", 
+                                  font=('Arial', 18), anchor='center', fill=self.card.suit_color)
             else:
                 canvas.create_text(cx, cy, text=f"{rank_str}\n{suit_char}", 
                                   font=('Arial', 16, 'bold'), fill=self.card.suit_color)
+            
+            canvas.config(bg='#FFF8F0')
+        else:
+            # Face down card - blue back with no text
+            canvas.create_rectangle(0, 0, 70, 98, fill='#2196F3')
         
         self.widget = canvas
         self.bind_click()
@@ -115,7 +126,7 @@ class CardWidget:
         self.card.y = new_y
         
         # Update widget position and appearance to face-down
-        self.widget.config(bg='#3a5f18')  # Face down green
+        self.widget.create_rectangle(0, 0, 70, 98, fill='#2196F3')
         self.widget.place(x=new_x, y=new_y)
         
         logger.info(f"Card {self.card.value} stacked at ({new_x},{new_y})")
@@ -130,30 +141,40 @@ class CardWidget:
         # Create centered window using game_instance.root
         win_window = tk.Toplevel(game_instance.root)
         win_window.title("You Win!!!")
+        
+        # Set size and appearance first
         win_window.geometry("300x200")
         win_window.configure(bg='#4caf50')
         win_window.transient(game_instance.root)
-        win_window.grab_set()
         
         # Center on screen
         x = (win_window.winfo_screenwidth() // 2) - 150
         y = (win_window.winfo_screenheight() // 2) - 100
         win_window.geometry("+{}+{}".format(x, y))
         
-        # Title label
+        # Create widgets before setting grab
         title_label = tk.Label(win_window, text="You Win!!!", 
                               font=('Arial', 24, 'bold'), bg='#4caf50', fg='white')
         title_label.pack(pady=20)
         
-        # Score info
         score_label = tk.Label(win_window, text=f"Final Score: {game_instance.score}", 
                               font=('Arial', 16), bg='#4caf50', fg='white')
         score_label.pack()
         
-        # Play again button
         def play_again():
             game_instance.new_game()
             win_window.destroy()
+        
+        btn = tk.Button(win_window, text="Play Again", font=('Arial', 14), 
+                        command=play_again, bg='#2e7d32', fg='white', 
+                        activebackground='#1b5e20', activeforeground='white',
+                        padx=30, pady=10)
+        btn.pack(pady=20)
+        
+        # Ensure window is ready before grabbing
+        win_window.update_idletasks()
+        win_window.lift()
+        win_window.grab_set()
         
         btn = tk.Button(win_window, text="Play Again", font=('Arial', 14), 
                         command=play_again, bg='#2e7d32', fg='white', 
@@ -224,15 +245,20 @@ class Game:
         self.deck_container = tk.Frame(self.canvas, bg='#2e7d32', width=100, height=180)
         self.deck_container.place(x=15, y=15)
 
-        # Generate 52 unique cards and place them randomly on canvas
-        deck = list(range(1, 53))
-        random.shuffle(deck)
+        # Generate 52 unique cards (Ace-King × 4 suits) and place them randomly
+        decks_suits = ['H', 'D', 'C', 'S']
         
-        for card_value in deck:
-            card = Card(card_value)
-            self.table_cards.append(card)
-            
-            # Random position within workspace (accounting for card size to prevent off-screen)
+        unique_cards = []
+        for suit in decks_suits:
+            ranks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+            for rank_val in ranks:
+                unique_cards.append(Card(rank_val, suit))
+        
+        random.shuffle(unique_cards)
+        self.table_cards.extend(unique_cards)
+        
+        # Now place each card at random position
+        for card in unique_cards:
             rand_x = random.randint(self.margin_left, self.max_x - 70)
             rand_y = random.randint(self.margin_top, self.max_y - 98)
             
