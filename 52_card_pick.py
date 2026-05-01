@@ -46,30 +46,49 @@ class CardWidget:
         
         canvas = tk.Canvas(self.parent, width=70, height=98)
         
-        # Draw face-up card with rotation (centered) - each rotation shows different face
         if self.card.face_up:
-            # Calculate centered positions for 70x98 card
-            cx = 35  # center x (width/2)
-            cy = 49  # center y (height/2)
+            cx, cy = 35, 49
             
-            # Each rotation shows a unique representation
-            if self.card.rotation == 1:
-                canvas.create_text(cx, cy - 10, text=f"{rank_str}", 
-                                  font=('Arial', 18, 'bold'), anchor='center', fill=self.card.suit_color)
-            elif self.card.rotation == 2:
-                canvas.create_text(cx, cy + 15, text=suit_char, 
-                                  font=('Arial', 32), anchor='center', fill=self.card.suit_color)
-            elif self.card.rotation == 3:
-                canvas.create_text(cx, cy - 10, text=f"{rank_str} {suit_char}", 
-                                  font=('Arial', 18), anchor='center', fill=self.card.suit_color)
+            # Rounded white background
+            margin, radius = 4, 10
+            points = [
+                (margin + radius, margin),
+                (70 - margin - radius, margin),
+                (70 - margin, margin + radius),
+                (70 - margin, 98 - margin - radius),
+                (70 - margin + radius, 98 - margin),
+                (margin + radius, 98 - margin),
+                (margin, 98 - margin + radius),
+                (margin, margin + radius)
+            ]
+            bg = canvas.create_polygon(points, outline='#2e7d32', width=4, fill='#FFF8F0')
+            
+            # Calculate rotation in degrees
+            angle_degrees = self.card.rotation * 90
+            
+            if angle_degrees > 0:
+                canvas.create_text(cx, cy, text=rank_str, font=('Arial', 18, 'bold'), 
+                                  anchor='center', fill=self.card.suit_color, rotation=-angle_degrees)
+                canvas.create_text(cx, cy, text=suit_char, font=('Arial', 28), 
+                                  anchor='center', fill=self.card.suit_color, rotation=-angle_degrees)
             else:
-                canvas.create_text(cx, cy, text=f"{rank_str}\n{suit_char}", 
-                                  font=('Arial', 16, 'bold'), fill=self.card.suit_color)
-            
-            canvas.config(bg='#FFF8F0')
+                canvas.create_text(cx, cy - 12, text=rank_str, font=('Arial', 18, 'bold'), 
+                                  anchor='center', fill=self.card.suit_color)
+                canvas.create_text(cx, cy + 6, text=suit_char, font=('Arial', 28), 
+                                  anchor='center', fill=self.card.suit_color)
         else:
-            # Face down card - blue back with no text
-            canvas.create_rectangle(0, 0, 70, 98, fill='#2196F3')
+            margin, radius = 4, 10
+            points = [
+                (margin + radius, margin),
+                (70 - margin - radius, margin),
+                (70 - margin, margin + radius),
+                (70 - margin, 98 - margin - radius),
+                (70 - margin + radius, 98 - margin),
+                (margin + radius, 98 - margin),
+                (margin, 98 - margin + radius),
+                (margin, margin + radius)
+            ]
+            canvas.create_polygon(points, outline='#2e7d32', width=4, fill='#2196F3')
         
         self.widget = canvas
         self.bind_click()
