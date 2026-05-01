@@ -23,7 +23,7 @@ A fast-paced card collection game built with Python and Tkinter!
 
 ## Game Screenshot
 
-![52 Card Pick](resources/game_screenshot.png)
+![52 Card Pick](resources/game.png)
 
 ## Requirements
 
