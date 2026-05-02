@@ -1,18 +1,20 @@
 import tkinter as tk
 from tkinter import messagebox
 import random
+import math
 import time
 import logging
 
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+card_width, card_height = 70, 98
+background = '#1b5e20'
 class Card:
     def __init__(self, rank, suit):
         self.value = rank
         self.suit = suit
         self.face_up = True
-        self.rotation = 0
         
         # Pre-compute rank and suit info
         
@@ -38,59 +40,49 @@ class CardWidget:
     def __init__(self, parent, card):
         self.parent = parent
         self.card = card
+        self.rotation = random.uniform(0, math.pi)
         self.widget = None
-        
+
     def create_widget(self):
-        rank_str = self.card.rank_str
-        suit_char = self.card.suit_char
-        
-        canvas = tk.Canvas(self.parent, width=70, height=98)
-        
+
+        fill = '#FFF6F3' if (self.card.face_up) else '#2196F3' 
+        outline = '#107d32'
+        self.widget = tk.Canvas(self.parent, width=card_width, 
+                                height=card_height, highlightthicknes=0,
+                                bg=background)
+        x1 = 0
+        y1 = 0
+        x2 = card_width 
+        y2 = card_height
+
+        card_id = self.widget.create_rectangle(
+            x1, y1, x2, y2, fill=fill, outline=outline)
         if self.card.face_up:
-            cx, cy = 35, 49
-            
-            # Rounded white background
-            margin, radius = 4, 10
-            points = [
-                (margin + radius, margin),
-                (70 - margin - radius, margin),
-                (70 - margin, margin + radius),
-                (70 - margin, 98 - margin - radius),
-                (70 - margin + radius, 98 - margin),
-                (margin + radius, 98 - margin),
-                (margin, 98 - margin + radius),
-                (margin, margin + radius)
-            ]
-            bg = canvas.create_polygon(points, outline='#2e7d32', width=4, fill='#FFF8F0')
-            
-            # Calculate rotation in degrees
-            angle_degrees = self.card.rotation * 90
-            
-            if angle_degrees > 0:
-                canvas.create_text(cx, cy, text=rank_str, font=('Arial', 18, 'bold'), 
-                                  anchor='center', fill=self.card.suit_color, rotation=-angle_degrees)
-                canvas.create_text(cx, cy, text=suit_char, font=('Arial', 28), 
-                                  anchor='center', fill=self.card.suit_color, rotation=-angle_degrees)
-            else:
-                canvas.create_text(cx, cy - 12, text=rank_str, font=('Arial', 18, 'bold'), 
-                                  anchor='center', fill=self.card.suit_color)
-                canvas.create_text(cx, cy + 6, text=suit_char, font=('Arial', 28), 
-                                  anchor='center', fill=self.card.suit_color)
-        else:
-            margin, radius = 4, 10
-            points = [
-                (margin + radius, margin),
-                (70 - margin - radius, margin),
-                (70 - margin, margin + radius),
-                (70 - margin, 98 - margin - radius),
-                (70 - margin + radius, 98 - margin),
-                (margin + radius, 98 - margin),
-                (margin, 98 - margin + radius),
-                (margin, margin + radius)
-            ]
-            canvas.create_polygon(points, outline='#2e7d32', width=4, fill='#2196F3')
         
-        self.widget = canvas
+            rank_str = self.card.rank_str
+            suit_char = self.card.suit_char
+            angle = self.rotation
+             
+            cos_val = math.cos(angle) 
+            sin_val = math.sin(angle) 
+
+            coords = self.widget.coords(card_id)
+            cx = sum(coords[0::2]) / (len(coords) / 2)
+            cy = sum(coords[1::2]) / (len(coords) / 2)
+            self.widget.create_text(cx, cy-5, text=rank_str, font=('Arial', 18, 'bold'), 
+                               anchor='center', fill=self.card.suit_color)
+            self.widget.create_text(cx, cy+20, text=suit_char, font=('Arial', 28), 
+                               anchor='center', fill=self.card.suit_color)
+
+            # new_coords = []
+            # for i in range(0, len(coords), 2):
+            #     tx, ty = coords[i] - cx, coords[i+1] - cy
+            #     nx = tx * cos_val - ty * sin_val + cx
+            #     ny = tx * sin_val + ty * cos_val + cy
+            #     new_coords.extend([nx, ny])
+            # print(new_coords)
+            # self.widget.coords(card_id, *new_coords)
+
         self.bind_click()
     
     def draw(self, x=None, y=None, rotation=0):
@@ -143,7 +135,7 @@ class CardWidget:
         self.card.y = new_y
         
         # Update widget position and appearance to face-down
-        self.widget.create_rectangle(0, 0, 70, 98, fill='#2196F3')
+        self.widget.create_rectangle(0, 0, card_width, card_height, fill='#2196F3')
         self.widget.place(x=new_x, y=new_y)
         
         logger.info(f"Card {self.card.value} stacked at ({new_x},{new_y})")
@@ -204,7 +196,6 @@ class Game:
         self.root = tk.Tk()
         self.root.title("52 Card Pick")
         self.root.configure(bg='#3d7c42')
-        
         # Set fixed window size: 1024x768 workspace
         self.root.geometry("1024x768")
         
@@ -214,7 +205,7 @@ class Game:
         max_x = 1009
         max_y = 753
         
-        self.canvas = tk.Canvas(self.root, width=max_x, height=max_y, bg='#1b5e20')
+        self.canvas = tk.Canvas(self.root, width=max_x, height=max_y, bg=background)
         self.canvas.pack(padx=margin_left, pady=margin_top)
         
         # Game state
@@ -273,21 +264,18 @@ class Game:
         
         # Now place each card at random position
         for card in self.table_cards:
-            rand_x = random.randint(self.margin_left, self.max_x - 70)
-            rand_y = random.randint(self.margin_top, self.max_y - 98)
+            rand_x = random.randint(self.margin_left, self.max_x - card_width)
+            rand_y = random.randint(self.margin_top, self.max_y - card_height)
             
-            # Random orientation: 0=normal, 1=rotated 90°, 2=flipped 180°, 3=rotated 270°
-            orientation = random.randint(0, 3)
             
             widget = CardWidget(self.canvas, card)
             widget.widget_id = id(widget)
             widget.create_widget()
-            widget.draw(x=rand_x, y=rand_y, rotation=orientation)
+            widget.draw(x=rand_x, y=rand_y)
             card.x = rand_x
             card.y = rand_y
-            card.rotation = orientation
             
-            logger.info(f"Card {card.value} initial pos: ({rand_x},{rand_y}) face_up={card.face_up} rot={orientation}")
+            logger.info(f"Card {card.value} initial pos: ({rand_x},{rand_y}) face_up={card.face_up}")
         
  
     def update_timer(self):
