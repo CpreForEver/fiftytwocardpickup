@@ -4,17 +4,54 @@ import random
 import math
 import time
 import logging
+from PIL import Image, ImageDraw, ImageTk, ImageColor, ImageFont
+
 
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 card_width, card_height = 70, 98
 background = '#1b5e20'
+class CardRenderer:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        try:
+            self.font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 24)
+            self.symbol_font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 36)
+        except IOError:
+            self.font = ImageFont.load_default()
+            self.symbol_font = ImageFont.load_default()
+
+    def render(self, card):
+        fill = '#FFF6F3' if card.face_up else '#2196F3'
+        outline = '#107d32'
+        
+        image = Image.new('RGBA', (self.width, self.height), color=(0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        rgba_fill = ImageColor.getrgb(fill)
+        rgba_fill = (rgba_fill[0], rgba_fill[1], rgba_fill[2], 255)
+        draw.rectangle([0, 0, self.width - 1, self.height - 1], fill=rgba_fill, outline=outline, width=2)
+        
+        if card.face_up:
+            suit_color = card.suit_color
+            draw.text((self.width // 2, self.height // 2 - 12), card.rank_str, fill=suit_color, anchor="mm", font=self.font)
+            draw.text((self.width // 2, self.height // 2 + 24), card.suit_char, fill=suit_color, anchor="mm", font=self.symbol_font)
+            
+        rotated_image = image.rotate(math.degrees(-card.rotation), expand=True, fillcolor=(0, 0, 0, 0))
+        return ImageTk.PhotoImage(rotated_image)
+
 class Card:
+
     def __init__(self, rank, suit):
         self.value = rank
         self.suit = suit
         self.face_up = True
+        self.rotation = random.uniform(0, math.pi)
+        self.x = 0
+        self.y = 0
+        self.photo = None
+        self.canvas_id = None
         
         # Pre-compute rank and suit info
         
@@ -36,193 +73,33 @@ class Card:
         else:
             self.suit_color = 'black'
 
-class CardWidget:
-    def __init__(self, parent, card):
-        self.parent = parent
-        self.card = card
-        self.rotation = random.uniform(0, math.pi)
-        self.widget = None
-
-    def create_widget(self):
-
-        fill = '#FFF6F3' if (self.card.face_up) else '#2196F3' 
-        outline = '#107d32'
-        self.widget = tk.Canvas(self.parent, width=card_width, 
-                                height=card_height, highlightthicknes=0,
-                                bg=background)
-        x1 = 0
-        y1 = 0
-        x2 = card_width 
-        y2 = card_height
-
-        card_id = self.widget.create_rectangle(
-            x1, y1, x2, y2, fill=fill, outline=outline)
-        if self.card.face_up:
-        
-            rank_str = self.card.rank_str
-            suit_char = self.card.suit_char
-            angle = self.rotation
-             
-            cos_val = math.cos(angle) 
-            sin_val = math.sin(angle) 
-
-            coords = self.widget.coords(card_id)
-            cx = sum(coords[0::2]) / (len(coords) / 2)
-            cy = sum(coords[1::2]) / (len(coords) / 2)
-            self.widget.create_text(cx, cy-5, text=rank_str, font=('Arial', 18, 'bold'), 
-                               anchor='center', fill=self.card.suit_color)
-            self.widget.create_text(cx, cy+20, text=suit_char, font=('Arial', 28), 
-                               anchor='center', fill=self.card.suit_color)
-
-            # new_coords = []
-            # for i in range(0, len(coords), 2):
-            #     tx, ty = coords[i] - cx, coords[i+1] - cy
-            #     nx = tx * cos_val - ty * sin_val + cx
-            #     ny = tx * sin_val + ty * cos_val + cy
-            #     new_coords.extend([nx, ny])
-            # print(new_coords)
-            # self.widget.coords(card_id, *new_coords)
-
-        self.bind_click()
-    
-    def draw(self, x=None, y=None, rotation=0):
-        """Draw card at specified coordinates with rotation"""
-        if x is not None and y is not None:
-            self.card.x = x
-            self.card.y = y
-        
-        # Redraw the widget with updated position and appearance
-        if self.widget:
-            self.widget.destroy()
-            self.create_widget()
-            self.widget.place(x=self.card.x, y=self.card.y)
-    
-    def bind_click(self):
-        """Bind click handler directly to this widget"""
-        self.widget.bind('<Button-1>', lambda e: self.on_click(e))
-    
-    def on_click(self, event):
-        """Handle card click - move to deck pile if face up."""
-        if not self.card.face_up:
-            return  # Only collect face-up cards
-        
-        logger.info(f"=== CARD CLICKED ===")
-        logger.info(f"Card {self.card.value}: pos=({self.card.x},{self.card.y})")
-        
-        # Move card to deck pile and create new face-down widget at stack position
-        game_instance.table_cards.remove(self.card)
-        game_instance.deck_pile.append(self.card)
-        game_instance.score += 10
-        
-        self.card.face_up = False
-        
-        # Single pile at top-left on deck container, max 5 cards high, then reset to starting position
-        if len(game_instance.deck_pile) > 6:  # More than 5 cards in pile
-            new_x = 25
-            new_y = 60
-        elif len(game_instance.deck_pile) > 1:
-            last_card_idx = len(game_instance.deck_pile) - 2
-            offset_x = 1  # 1 pixel horizontal offset
-            offset_y = 1  # 1 pixel vertical offset
-            
-            new_x = game_instance.deck_pile[last_card_idx].x + offset_x
-            new_y = game_instance.deck_pile[last_card_idx].y + offset_y
-        else:
-            new_x = 25
-            new_y = 60
-        
-        self.card.x = new_x
-        self.card.y = new_y
-        
-        # Update widget position and appearance to face-down
-        self.widget.create_rectangle(0, 0, card_width, card_height, fill='#2196F3')
-        self.widget.place(x=new_x, y=new_y)
-        
-        logger.info(f"Card {self.card.value} stacked at ({new_x},{new_y})")
-        logger.info(f"Score: {game_instance.score}, Deck size: {len(game_instance.deck_pile)}")
-        
-        # Check if game won (all 52 cards collected)
-        if len(game_instance.deck_pile) >= 52:
-            self.show_win_screen()
-
-    def show_win_screen(self):
-        """Show win splash screen with play again button."""
-        # Create centered window using game_instance.root
-        win_window = tk.Toplevel(game_instance.root)
-        win_window.title("You Win!!!")
-        
-        # Set size and appearance first
-        win_window.geometry("300x200")
-        win_window.configure(bg='#4caf50')
-        win_window.transient(game_instance.root)
-        
-        # Center on screen
-        x = (win_window.winfo_screenwidth() // 2) - 150
-        y = (win_window.winfo_screenheight() // 2) - 100
-        win_window.geometry("+{}+{}".format(x, y))
-        
-        # Create widgets before setting grab
-        title_label = tk.Label(win_window, text="You Win!!!", 
-                              font=('Arial', 24, 'bold'), bg='#4caf50', fg='white')
-        title_label.pack(pady=20)
-        
-        score_label = tk.Label(win_window, text=f"Final Score: {game_instance.score}", 
-                              font=('Arial', 16), bg='#4caf50', fg='white')
-        score_label.pack()
-        
-        def play_again():
-            game_instance.new_game()
-            win_window.destroy()
-        
-        btn = tk.Button(win_window, text="Play Again", font=('Arial', 14), 
-                        command=play_again, bg='#2e7d32', fg='white', 
-                        activebackground='#1b5e20', activeforeground='white',
-                        padx=30, pady=10)
-        btn.pack(pady=20)
-        
-        # Ensure window is ready before grabbing
-        win_window.update_idletasks()
-        win_window.lift()
-        win_window.grab_set()
-        
-        btn = tk.Button(win_window, text="Play Again", font=('Arial', 14), 
-                        command=play_again, bg='#2e7d32', fg='white', 
-                        activebackground='#1b5e20', activeforeground='white',
-                        padx=30, pady=10)
-        btn.pack(pady=20)
-
 class Game:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("52 Card Pick")
         self.root.configure(bg='#3d7c42')
-        # Set fixed window size: 1024x768 workspace
         self.root.geometry("1024x768")
         
-        # Create main canvas with margin
         margin_left = 15
         margin_top = 15
-        max_x = 1009
-        max_y = 753
+        self.max_x = 1009
+        self.max_y = 753
         
-        self.canvas = tk.Canvas(self.root, width=max_x, height=max_y, bg=background)
+        self.canvas = tk.Canvas(self.root, width=self.max_x, height=self.max_y, bg=background)
         self.canvas.pack(padx=margin_left, pady=margin_top)
         
-        # Game state
         self.table_cards = []
         self.deck_pile = []
         self.score = 0
         self.time = 0
         self.last_time = time.time()
         self.status_var = tk.StringVar(value="Score: 0  Time: 0")
+        self.card_map = {}
         
-        # Canvas dimensions (for new_game)
         self.margin_left = margin_left
         self.margin_top = margin_top
-        self.max_x = max_x
-        self.max_y = max_y
+        self.renderer = CardRenderer(card_width, card_height)
         
-        # Create menu bar
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
         
@@ -234,72 +111,104 @@ class Game:
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.quit)
         
-        # Start game
         self.new_game()
         self.update_timer()
-
+        self.canvas.bind('<Button-1>', self.on_canvas_click)
+    def update_status(self):
+        self.canvas.itemconfig(self.status_id, text=self.status_var.get())
     def new_game(self):
-        """Initialize a new game with randomly placed cards."""
         logger.info("=== Starting new game ===")
         self.score = 0
         self.table_cards = []
         self.deck_pile = []
+        self.card_map = {}
+        self.canvas.delete("all")
         
-        # Clear existing widgets
-        for widget in self.canvas.winfo_children():
-            widget.destroy()
-        
-      # Create deck pile container at top-left (15,15)
-        self.deck_container = tk.Frame(self.canvas, bg='#2e7d32', width=100, height=180)
-        self.deck_container.place(x=15, y=15)
-
-        # Generate 52 unique cards (Ace-King × 4 suits) and place them randomly
+        self.status_id = self.canvas.create_text(10, self.max_y - 30, anchor="sw", text="", font=("Arial", 14, "bold"), fill="white")
+        self.update_status()
         decks_suits = ['H', 'D', 'C', 'S']
-        
         for suit in decks_suits:
-            ranks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-            for rank_val in ranks:
-                self.table_cards.append(Card(rank_val, suit))
-        
-        
-        # Now place each card at random position
+            for rank_val in range(1, 14):
+                card = Card(rank_val, suit)
+                self.table_cards.append(card)
         for card in self.table_cards:
             rand_x = random.randint(self.margin_left, self.max_x - card_width)
             rand_y = random.randint(self.margin_top, self.max_y - card_height)
-            
-            
-            widget = CardWidget(self.canvas, card)
-            widget.widget_id = id(widget)
-            widget.create_widget()
-            widget.draw(x=rand_x, y=rand_y)
             card.x = rand_x
             card.y = rand_y
             
-            logger.info(f"Card {card.value} initial pos: ({rand_x},{rand_y}) face_up={card.face_up}")
-        
- 
+            card.photo = self.renderer.render(card)
+            card.canvas_id = self.canvas.create_image(card.x, card.y, image=card.photo, anchor="center", tags="card")
+            self.card_map[card.canvas_id] = card
     def update_timer(self):
-        """Update timer every second."""
-        self.time = int(time.time()) - self.last_time
+        self.time = int(time.time() - self.last_time)
         self.status_var.set(f"Score: {self.score}  Time: {self.time}")
-        
+        self.update_status()
         self.root.after(1000, self.update_timer)
-
+    def on_canvas_click(self, event):
+        item = self.canvas.find_withtag("current")
+        if item:
+            canvas_id = item[0]
+            if canvas_id in self.card_map:
+                card = self.card_map[canvas_id]
+                if card.face_up:
+                    # Geometric hit detection for rotated cards
+                    dx = event.x - card.x
+                    dy = event.y - card.y
+                    cos_r = math.cos(card.rotation)
+                    sin_r = math.sin(card.rotation)
+                    rx = dx * cos_r - dy * sin_r
+                    ry = dx * sin_r + dy * cos_r
+                    
+                    if abs(rx) <= card_width / 2 and abs(ry) <= card_height / 2:
+                        self.collect_card(card)
+    def collect_card(self, card):
+        logger.info(f"=== COLLECTING CARD {card.value} ===")
+        self.score += 10
+        card.face_up = False
+        card.rotation = 0
+        self.table_cards.remove(card)
+        self.deck_pile.append(card)
+        
+        if len(self.deck_pile) > 6:
+            new_x, new_y = 50, 60
+        elif len(self.deck_pile) > 1:
+            last_card = self.deck_pile[-2]
+            new_x, new_y = last_card.x + 2, last_card.y + 2
+        else:
+            new_x, new_y = 50, 60
+        
+        card.x, card.y = new_x, new_y
+        self.redraw_card(card)
+        
+        if len(self.deck_pile) >= 52:
+            self.show_win_screen()
+    def redraw_card(self, card):
+        card.photo = self.renderer.render(card)
+        self.canvas.itemconfig(card.canvas_id, image=card.photo)
+        self.canvas.coords(card.canvas_id, card.x, card.y)
     def show_score(self):
-        """Show current score in dialog."""
         messagebox.showinfo("Score", f"Current Score: {self.score}")
-
+    def show_win_screen(self):
+        win_window = tk.Toplevel(self.root)
+        win_window.title("You Win!!!")
+        win_window.geometry("300x200")
+        win_window.configure(bg='#4caf50')
+        win_window.transient(self.root)
+        x = (win_window.winfo_screenwidth() // 2) - 150
+        y = (win_window.winfo_screenheight() // 2) - 100
+        win_window.geometry("+{}+{}".format(x, y))
+        
+        tk.Label(win_window, text="You Win!!!", font=('Arial', 24, 'bold'), bg='#4caf50', fg='white').pack(pady=20)
+        tk.Label(win_window, text=f"Final Score: {self.score}", font=('Arial', 16), bg='#4caf50', fg='white').pack()
+        
+        def play_again():
+            win_window.destroy()
+            self.new_game()
+            
+        tk.Button(win_window, text="Play Again", font=('Arial', 14), command=play_again, bg='#2e7d32', fg='white', padx=30, pady=10).pack(pady=20)
+        win_window.grab_set()
 if __name__ == "__main__":
-    game_instance = None
-    
-    def log_click(event):
-        """Log all clicks for debugging."""
-        logger.info(f"=== CANVAS CLICKED AT ({event.x},{event.y}) ===")
-    
-    def log_card_state(card, index):
-        """Log card state at specific position."""
-        logger.info(f"Card {card.value} at index {index}: face_up={card.face_up}, pos=({card.x},{card.y}), rot={card.rotation}")
-
     game_instance = Game()
-    game_instance.root.protocol("WM_DELETE_WINDOW", lambda: exit(0))
+    game_instance.root.protocol("WM_DELETE_WINDOW", game_instance.root.destroy)
     game_instance.root.mainloop()
